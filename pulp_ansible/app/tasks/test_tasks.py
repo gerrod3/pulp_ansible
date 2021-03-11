@@ -161,3 +161,34 @@ def add_content_to_repositories(collection_version_pk, repositories_pks):
         with repository.new_version() as new_version:
             qs = CollectionVersion.objects.filter(pk=collection_version_pk)
             new_version.add_content(qs)
+
+
+def remove_content_from_repositories(collection_version_pks, repository_pk):
+    """
+    Remove CollectionVersions from a repository
+
+    Args:
+        collection_version_pks: The pks of the CollectionVersions to remove from the repository.
+        repository_pk: The pks of the AnsibleRepository to remove the CollectionVersion from.
+    """
+    repo = AnsibleRepository.objects.filter(pk=repository_pk).first()
+    with repo.new_version() as new_version:
+        qs = CollectionVersion.objects.filter(pk__in=collection_version_pks)
+        new_version.remove_content(qs)
+
+
+def create_new_repo_versions(repository_name, versions_to_add):
+    """
+    Takes the repository and creates (new_version - current_version) number of repository versions
+    """
+    repo = AnsibleRepository.objects.filter(name=repository_name).first()
+    content_pk = [i for i in repo.latest_version().content.values_list("pk", flat=True)]
+    for i in range(versions_to_add // 2):
+        end = 2 if versions_to_add % 2 and i == 0 else 1
+        random.shuffle(content_pk)
+        remove_args = (content_pk[:end], repo.pk)
+        enqueue_with_reservation(remove_content_from_repositories, [repo], args=remove_args)
+
+        for j in range(end):
+            add_args = (content_pk[j], [repo.pk])
+            enqueue_with_reservation(add_content_to_repositories, [repo], args=add_args)
