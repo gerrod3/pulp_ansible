@@ -1,0 +1,2 @@
+Optimized unpaginated collection_versions endpoint
+(backported from #8746)
